@@ -7,7 +7,7 @@
 
 std::vector<int> get_horizontal(int** capacities, int m, int n);
 std::vector<int> get_vertical(int** capacities, int m, int n);
-void handle_free_case(Solver& s, int** capacities, int m, int n, int i, int j);
+void handle_free_case(Solver& s, int** capacities, int m, int n);
 void handle_nl_wall(Solver& s, int** capacities, int m, int n, int i, int j);
 /**
  * Pretty prints the given matrix
@@ -44,15 +44,16 @@ void solve(int** capacities, int m, int n, bool find_all) {
             vars[i][j] = s.newVar();
         }
     }
+    handle_free_case(s, capacities, m, n);
     //Iterate throughout all the grid
     for (int i = 0; i < m; ++i) {
         for (int j = 0; j < n; ++j) {
             //When it's a free (lightable) case
             if (capacities[i][j] == -2) {
-                handle_free_case(s, capacities, m, n, i, j);
+                //handle_free_case(s, capacities, m, n, i, j);
             }
             else if (capacities[i][j] == -1) {
-                handle_nl_wall(s, capacities, m, n, i, j);
+                //handle_nl_wall(s, capacities, m, n, i, j);
             }
 
         }
@@ -75,27 +76,34 @@ void printlogical(int i, int j) {
  * @param m: height of each instance
  * @param n: width of each instance
  */
-void handle_free_case(Solver& s, int var, int** capacities, int m, int n, int i, int j) {
+void handle_free_case(Solver& s, int** capacities, int m, int n) {
     vec<Lit> lits;
     //For each case (thus literal/variable in the SAT), we find
     //the other cases which share the vertical and horizontal lines
-    std::vector<int> horizontals = get_horizontal(capacities,m,n,i);
-    std::vector<int> verticals = get_vertical(capacities,m,n,j);
+    std::vector<int> horizontals = get_horizontal(capacities,m,n);
+    std::vector<int> verticals = get_vertical(capacities,m,n);
 
-    for(int j = 1; j < horizontals.size(); ++j) {
-        lits.push(~Lit(var));
+    for(int i = 0; i < horizontals.size(); i+=2) {
+        printlogical(horizontals[i], horizontals[i+1]);
+    }
+    for(int i = 0; i < verticals.size(); i+=2) {
+        printlogical(verticals[i], verticals[i+1]);
     }
 
-    // for (int j : horizontals) {
+    // for(int k = 1; k < horizontals.size(); ++k) {
     //     lits.push(~Lit(var));
-    //     lits.push(~Lit(j));
+    // }
+
+    // for (int k : horizontals) {
+    //     lits.push(~Lit(var));
+    //     lits.push(~Lit(k));
     //     s.addClause(lits);
     //     lits.clear();
     // }
     //
-    // for (int j : verticals) {
+    // for (int k : verticals) {
     //     lits.push(~Lit(var));
-    //     lits.push(~Lit(j));
+    //     lits.push(~Lit(k));
     //     s.addClause(lits);
     //     lits.clear();
     // }
@@ -121,7 +129,7 @@ void handle_nl_wall(Solver& s, int** capacities, int m, int n, int i, int j) {
  * @param m: height of each instance
  * @param n: width of each instance
  */
- std::vector<int> get_horizontal(int** capacities, int m, int n) {
+std::vector<int> get_horizontal(int** capacities, int m, int n) {
     std::vector<int> horizontals;
     for(int i = 0; i < m; ++i) {
       int j = -1;
@@ -132,8 +140,8 @@ void handle_nl_wall(Solver& s, int** capacities, int m, int n, int i, int j) {
           continue;
         }
         //pushes a pair of cases to bundle with in a clause
-        horizontals.push_bacj(i*n+j);
-        horizontals.push_bacj(i*n+j+1);
+        horizontals.push_back(i*n+j);
+        horizontals.push_back(i*n+j+1);
       }
     }
     return horizontals;
@@ -156,8 +164,8 @@ void handle_nl_wall(Solver& s, int** capacities, int m, int n, int i, int j) {
            continue;
          }
          //pushes a pair of cases to bundle with in a clause
-         verticals.push_bacj(i*n+j);
-         verticals.push_bacj((i+1)*n+j);
+         verticals.push_back(i*n+j);
+         verticals.push_back((i+1)*n+j);
        }
      }
      return verticals;
