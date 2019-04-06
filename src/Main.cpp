@@ -3,12 +3,29 @@
  */
 #include <iostream>
 #include <vector>
+#include <string>
 #include "Solver.hpp"
 
 std::vector<int> get_horizontal(int** capacities, int m, int n);
 std::vector<int> get_vertical(int** capacities, int m, int n);
 void handle_free_case(Solver& s, int** capacities, int m, int n);
 void handle_walls(Solver& s, int** capacities, int m, int n);
+
+/*
+ * Credit : https://stackoverflow.com/questions/12991758/creating-all-possible-k-combinations-of-n-items-in-c/28698654
+ */
+void get_combinations(int offset, int k, std::vector<int>& vec,  std::vector<int>& combinations, std::vector<int>& temp) {
+    if (k == 0) {
+        combinations.insert(combinations.end(), temp.begin(), temp.end());
+        return;
+    }
+    for (int i = offset; i <= vec.size() - k; ++i) {
+        temp.push_back(vec[i]);
+        get_combinations(i+1, k-1, vec, combinations, temp);
+        temp.pop_back();
+    }
+}
+
 /**
  * Pretty prints the given matrix
  * @param  matrix: matrix to print
@@ -50,10 +67,6 @@ void solve(int** capacities, int m, int n, bool find_all) {
   // Fonction à compléter pour les questions 2 et 3 (et bonus 1)
 }
 
-void printlogical(int i, int j) {
-    std::cout << "(~" << i << "V" << "~" << j << ")" << std::endl;
-}
-
 /**
  * Handles the construction of clauses for all the free (lightable) cases
  * @param s: Solver
@@ -67,7 +80,6 @@ void handle_free_case(Solver& s, int** capacities, int m, int n) {
     //the other cases which share the vertical and horizontal lines
     std::vector<int> horizontals = get_horizontal(capacities,m,n);
     std::vector<int> verticals = get_vertical(capacities,m,n);
-
     for(int i = 0; i < horizontals.size(); i+=2) {
         lits.push(~Lit(horizontals[i]));
         lits.push(~Lit(horizontals[i+1]));
@@ -92,13 +104,44 @@ std::vector<int> get_adjacent_cases(int** capacities, int m, int n, int i, int j
     return adjacents;
 }
 
+void handle_edge_case(Solver& s, std::vector<int>& adjacents) {
+    vec<Lit> lits;
+    for (int adj : adjacents) {
+        lits.push(Lit(adj));
+        s.addClause(lits);
+        lits.clear();
+    }
+}
 
 void handle_one_capacity(Solver& s, std::vector<int>& adjacents) {
     vec<Lit> lits;
     //Edge case where only one case is free
     if (adjacents.size() == 1) {
-        lits.push(Lit(adjacents[0]));
-        s.addClause(lits);
+        handle_edge_case(s, adjacents);
+        return;
+    }
+    std::vector<int> combinations;
+    std::vector<int> temp;
+    get_combinations(0, 2, adjacents, combinations, temp);
+    //for(int k = 0; k < combinations.size())
+    // for(int i = 0; i < adjacents.size(); ++i) {
+    //     for (int j = i+1; j < adjacents.size(); ++j) {
+    //         lits.push(~Lit(adjacents[i]));
+    //         lits.push(~Lit(adjacents[j]));
+    //         s.addClause(lits);
+    //         lits.clear();
+    //     }
+    // }
+    for (int adj : adjacents) lits.push(Lit(adj));
+    s.addClause(lits);
+    lits.clear();
+}
+
+void handle_two_capacity(Solver& s, std::vector<int> adjacents) {
+    vec<Lit> lits;
+    //Edge case where only two cases are free
+    if (adjacents.size() == 2) {
+        handle_edge_case(s, adjacents);
         return;
     }
     for(int i = 0; i < adjacents.size(); ++i) {
@@ -112,10 +155,6 @@ void handle_one_capacity(Solver& s, std::vector<int>& adjacents) {
     for (int adj : adjacents) lits.push(Lit(adj));
     s.addClause(lits);
     lits.clear();
-}
-
-void handle_two_capacity(Solver& s, std::vector<int> adjacents) {
-
 }
 
 /**
@@ -133,6 +172,7 @@ void handle_walls(Solver& s, int** capacities, int m, int n) {
             //undefined capacity => we don't bother
             int c = capacities[i][j];
             if (c == -1) continue;
+            //capacity of 0, we can't place any lightbulb around it
             else if (c == 0) {
                 for (int adj : adjacents) lits.push(~Lit(adj));
                 s.addClause(lits);
@@ -143,7 +183,7 @@ void handle_walls(Solver& s, int** capacities, int m, int n) {
                 handle_one_capacity(s, adjacents);
             }
             else if (c == 2) {
-
+                handle_two_capacity(s, adjacents);
             }
         }
     }
