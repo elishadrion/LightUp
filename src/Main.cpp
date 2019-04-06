@@ -5,8 +5,8 @@
 #include <vector>
 #include "Solver.hpp"
 
-std::vector<int> get_horizontal(int** capacities, int m, int n, int i, int j);
-std::vector<int> get_vertical(int** capacities, int m, int n, int i, int j);
+std::vector<int> get_horizontal(int** capacities, int m, int n);
+std::vector<int> get_vertical(int** capacities, int m, int n);
 void handle_free_case(Solver& s, int** capacities, int m, int n, int i, int j);
 void handle_nl_wall(Solver& s, int** capacities, int m, int n, int i, int j);
 /**
@@ -79,23 +79,23 @@ void handle_free_case(Solver& s, int var, int** capacities, int m, int n, int i,
     vec<Lit> lits;
     //For each case (thus literal/variable in the SAT), we find
     //the other cases which share the vertical and horizontal lines
-    std::vector<int> horizontals = get_horizontal(capacities,m,n,i,j);
-    std::vector<int> verticals = get_vertical(capacities,m,n,i,j);
+    std::vector<int> horizontals = get_horizontal(capacities,m,n,i);
+    std::vector<int> verticals = get_vertical(capacities,m,n,j);
 
-    for(int k = 1; k < horizontals.size(); ++k) {
+    for(int j = 1; j < horizontals.size(); ++j) {
         lits.push(~Lit(var));
     }
 
-    // for (int k : horizontals) {
+    // for (int j : horizontals) {
     //     lits.push(~Lit(var));
-    //     lits.push(~Lit(k));
+    //     lits.push(~Lit(j));
     //     s.addClause(lits);
     //     lits.clear();
     // }
     //
-    // for (int k : verticals) {
+    // for (int j : verticals) {
     //     lits.push(~Lit(var));
-    //     lits.push(~Lit(k));
+    //     lits.push(~Lit(j));
     //     s.addClause(lits);
     //     lits.clear();
     // }
@@ -117,43 +117,51 @@ void handle_nl_wall(Solver& s, int** capacities, int m, int n, int i, int j) {
 
 /**
  * Returns all the horizontal lightable cases
- * by Xij
  * @param capacities : the matrix representing the problem
- * @param i: y position of the case
- * @param j: x position of the case
  * @param m: height of each instance
  * @param n: width of each instance
  */
- std::vector<int> get_horizontal(int** capacities, int m, int n, int i, int j) {
-     std::vector<int> horizontals;
-     for (int k = j-1; k > 0 && capacities[i][k] == -2; --k) {
-         horizontals.push_back(i*n+k);
-     }
-     for (int k = j+1; k < n && capacities[i][k] == -2; ++k) {
-         horizontals.push_back(i*n+k);
-     }
-     return horizontals;
+ std::vector<int> get_horizontal(int** capacities, int m, int n) {
+    std::vector<int> horizontals;
+    for(int i = 0; i < m; ++i) {
+      int j = -1;
+      while(j+1 < n-1) {
+        ++j;
+        //One of the pair is a wall, we pass
+        if (capacities[i][j] != -2 || capacities[i][j+1] != -2) {
+          continue;
+        }
+        //pushes a pair of cases to bundle with in a clause
+        horizontals.push_bacj(i*n+j);
+        horizontals.push_bacj(i*n+j+1);
+      }
+    }
+    return horizontals;
  }
 
 /**
  * Returns all the vertical lightable cases
- * by Xij
  * @param capacities : the matrix representing the problem
- * @param i: y position of the case
- * @param j: x position of the case
  * @param m: height of each instance
  * @param n: width of each instance
  */
-std::vector<int> get_vertical(int** capacities, int m, int n, int i, int j) {
-    std::vector<int> verticals;
-    for (int k = i-1; k > 0 && capacities[k][j] == -2; --k) {
-        verticals.push_back(k*n+j);
-    }
-    for (int k = i+1; k < m && capacities[k][j] == -2; ++k) {
-        verticals.push_back(k*n+j);
-    }
-    return verticals;
-}
+ std::vector<int> get_vertical(int** capacities, int m, int n) {
+     std::vector<int> verticals;
+     for (int j = 0; j < n; ++j) {
+       int i = -1;
+       while (i+1 < m-1) {
+         ++i;
+         //One of the pair is a wall, we pass
+         if (capacities[i][j] != -2 || capacities[i+1][j] != -2) {
+           continue;
+         }
+         //pushes a pair of cases to bundle with in a clause
+         verticals.push_bacj(i*n+j);
+         verticals.push_bacj((i+1)*n+j);
+       }
+     }
+     return verticals;
+ }
 
 /**
  * Generates `l` instances of the light-up problem, each with a unique solution,
