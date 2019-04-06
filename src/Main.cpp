@@ -8,7 +8,7 @@
 std::vector<int> get_horizontal(int** capacities, int m, int n);
 std::vector<int> get_vertical(int** capacities, int m, int n);
 void handle_free_case(Solver& s, int** capacities, int m, int n);
-void handle_nl_wall(Solver& s, int** capacities, int m, int n, int i, int j);
+void handle_walls(Solver& s, int** capacities, int m, int n);
 /**
  * Pretty prints the given matrix
  * @param  matrix: matrix to print
@@ -45,19 +45,7 @@ void solve(int** capacities, int m, int n, bool find_all) {
         }
     }
     handle_free_case(s, capacities, m, n);
-    //Iterate throughout all the grid
-    for (int i = 0; i < m; ++i) {
-        for (int j = 0; j < n; ++j) {
-            //When it's a free (lightable) case
-            if (capacities[i][j] == -2) {
-                //handle_free_case(s, capacities, m, n, i, j);
-            }
-            else if (capacities[i][j] == -1) {
-                //handle_nl_wall(s, capacities, m, n, i, j);
-            }
-
-        }
-    }
+    handle_walls(s, capacities, m, n);
 
   // Fonction à compléter pour les questions 2 et 3 (et bonus 1)
 }
@@ -67,12 +55,9 @@ void printlogical(int i, int j) {
 }
 
 /**
- * Handles the construction of clauses for the free (lightable) case
+ * Handles the construction of clauses for all the free (lightable) cases
  * @param s: Solver
- * @param var: index of variable representing the current case
  * @param capacities : the matrix representing the problem
- * @param i: y position of the case
- * @param j: x position of the case
  * @param m: height of each instance
  * @param n: width of each instance
  */
@@ -84,43 +69,84 @@ void handle_free_case(Solver& s, int** capacities, int m, int n) {
     std::vector<int> verticals = get_vertical(capacities,m,n);
 
     for(int i = 0; i < horizontals.size(); i+=2) {
-        printlogical(horizontals[i], horizontals[i+1]);
+        lits.push(~Lit(horizontals[i]));
+        lits.push(~Lit(horizontals[i+1]));
+        s.addClause(lits);
+        lits.clear();
     }
     for(int i = 0; i < verticals.size(); i+=2) {
-        printlogical(verticals[i], verticals[i+1]);
+        lits.push(~Lit(verticals[i]));
+        lits.push(~Lit(verticals[i+1]));
+        s.addClause(lits);
+        lits.clear();
     }
+}
 
-    // for(int k = 1; k < horizontals.size(); ++k) {
-    //     lits.push(~Lit(var));
-    // }
 
-    // for (int k : horizontals) {
-    //     lits.push(~Lit(var));
-    //     lits.push(~Lit(k));
-    //     s.addClause(lits);
-    //     lits.clear();
-    // }
-    //
-    // for (int k : verticals) {
-    //     lits.push(~Lit(var));
-    //     lits.push(~Lit(k));
-    //     s.addClause(lits);
-    //     lits.clear();
-    // }
+std::vector<int> get_adjacent_cases(int** capacities, int m, int n, int i, int j) {
+    std::vector<int> adjacents;
+    if (i-1 >= 0 && capacities[i-1][j] == -2) adjacents.push_back((i-1)*n+j);
+    if (i+1 < m && capacities[i+1][j] == -2) adjacents.push_back((i+1)*n+j);
+    if (j-1 >= 0 && capacities[i][j-1] == -2) adjacents.push_back(i*n+j-1);
+    if (j+1 < n && capacities[i][j+1] == -2) adjacents.push_back(i*n+j+1);
+    return adjacents;
+}
+
+
+void handle_one_capacity(Solver& s, std::vector<int>& adjacents) {
+    vec<Lit> lits;
+    //Edge case where only one case is free
+    if (adjacents.size() == 1) {
+        lits.push(Lit(adjacents[0]));
+        s.addClause(lits);
+        return;
+    }
+    for(int i = 0; i < adjacents.size(); ++i) {
+        for (int j = i+1; j < adjacents.size(); ++j) {
+            lits.push(~Lit(adjacents[i]));
+            lits.push(~Lit(adjacents[j]));
+            s.addClause(lits);
+            lits.clear();
+        }
+    }
+    for (int adj : adjacents) lits.push(Lit(adj));
+    s.addClause(lits);
+    lits.clear();
+}
+
+void handle_two_capacity(Solver& s, std::vector<int> adjacents) {
+
 }
 
 /**
- * Handles the constructor of clauses for a no-limit wall (0 to 4 lightbulbs)
+ * Handles the constructor of clauses for all the walls (0 to 4 lightbulbs)
  * @param s: Solver
  * @param capacities : the matrix representing the problem
- * @param i: y position of the case
- * @param j: x position of the case
  * @param m: height of each instance
  * @param n: width of each instance
  */
-void handle_nl_wall(Solver& s, int** capacities, int m, int n, int i, int j) {
+void handle_walls(Solver& s, int** capacities, int m, int n) {
     vec<Lit> lits;
+    for (int i = 0; i < m; ++i) {
+        for (int j = 0; j < n; ++j) {
+            std::vector<int> adjacents = get_adjacent_cases(capacities, m, n, i, j);
+            //undefined capacity => we don't bother
+            int c = capacities[i][j];
+            if (c == -1) continue;
+            else if (c == 0) {
+                for (int adj : adjacents) lits.push(~Lit(adj));
+                s.addClause(lits);
+                lits.clear();
+            }
+            //capacity of 1 : k! clauses
+            else if (c == 1) {
+                handle_one_capacity(s, adjacents);
+            }
+            else if (c == 2) {
 
+            }
+        }
+    }
 }
 
 /**
