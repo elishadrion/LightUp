@@ -1,4 +1,4 @@
-/* 426215 - Drion elisha
+/* 426215 - Drion Elisha
  *
  */
 #include <iostream>
@@ -8,7 +8,7 @@
 
 std::vector<int> get_horizontal(int** capacities, int m, int n);
 std::vector<int> get_vertical(int** capacities, int m, int n);
-void handle_no_sharing_case(Solver& s, int** capacities, int m, int n);
+void handle_no_sharing_cases(Solver& s, int** capacities, int m, int n);
 void handle_all_lighted_up(Solver& s, int** capacities, int m, int n);
 void handle_walls(Solver& s, int** capacities, int m, int n);
 
@@ -57,14 +57,10 @@ void solve(int** capacities, int m, int n, bool find_all) {
     //Xij = 0..4 -> mur capacité
     Solver s;
     //Create a variable per case
-    for (int i = 0; i < m; ++i) {
-        for (int j = 0; j < n; ++j) {
-            s.newVar();
-        }
-    }
-    handle_no_sharing_case(s, capacities, m, n);
+    for (int i = 0; i < m*n; ++i) s.newVar();
+    handle_no_sharing_cases(s, capacities, m, n);
     handle_all_lighted_up(s, capacities, m, n);
-    //handle_walls(s, capacities, m, n);
+    handle_walls(s, capacities, m, n);
 
 
     if (s.solve()) { // la formule est satisfaisable
@@ -95,7 +91,7 @@ void solve(int** capacities, int m, int n, bool find_all) {
  * @param m: height of each instance
  * @param n: width of each instance
  */
-void handle_no_sharing_case(Solver& s, int** capacities, int m, int n) {
+void handle_no_sharing_cases(Solver& s, int** capacities, int m, int n) {
     //For each case (thus literal/variable in the SAT), we find
     //the other cases which share the vertical and horizontal lines
     std::vector<int> horizontals = get_horizontal(capacities,m,n);
@@ -118,48 +114,38 @@ bool is_in_vec(std::vector<int>& vec, int check) {
 void handle_all_lighted_up(Solver& s, int** capacities, int m, int n) {
     //"Cross" formed by the row and the column we want lighted up
     vec<Lit> lits;
-    std::vector<int> cross;
     for (int i = 0; i < m; ++i) {
         for(int j = 0; j < n; ++j) {
             //For every case, we get the entire cross
             //Starting with the entire row and then the entire column
-            int k = j;
+            lits.push(Lit(i*n+j));
+            int k = j+1;
             //From current position to rightmost of the row
-            while (k < n) {
-                //Wall case
-                if (capacities[i][k] != -2) break;
-                else if (!is_in_vec(cross, i*n+k)) cross.push_back(i*n+k);
+            while (k < n && capacities[i][k] == -2) {
+                lits.push(Lit(i*n+k));
                 ++k;
             }
-            k = j;
+            k = j-1;
             //From current position to leftmost of the row
-            while (k >= 0) {
-                //Wall case
-                if (capacities[i][k] != -2) break;
-                else if (!is_in_vec(cross, i*n+k)) cross.push_back(i*n+k);
+            while (k >= 0 && capacities[i][k] == -2) {
+                lits.push(Lit(i*n+k));
                 --k;
             }
             //Entire column
-            k = i;
+            k = i+1;
             //From current position to bottom of column
-            while (k < m) {
-                if (capacities[k][j] != -2) break;
-                else if (!is_in_vec(cross, k*n+j)) cross.push_back(k*n+j);
+            while (k < m && capacities[k][j] == -2) {
+                lits.push(Lit(k*n+j));
                 ++k;
             }
-            k = i;
+            k = i-1;
             //From current position to top of column
-            while (k >= 0) {
-                if (capacities[k][j] != -2) break;
-                else if (!is_in_vec(cross, k*n+j)) cross.push_back(k*n+j);
+            while (k >= 0 && capacities[k][j] == -2) {
+                lits.push(Lit(k*n+j));
                 --k;
-            }
-            for (int c : cross) {
-                lits.push(Lit(c));
             }
             s.addClause(lits);
             lits.clear();
-            cross.clear();
         }
     }
 }
@@ -206,7 +192,6 @@ void handle_one_capacity(Solver& s, std::vector<int>& adjacents) {
     //Enforce placing a lightbulb on a case
     for (int adj : adjacents) lits.push(Lit(adj));
     s.addClause(lits);
-    lits.clear();
 }
 
 /**
@@ -245,12 +230,10 @@ void handle_walls(Solver& s, int** capacities, int m, int n) {
             //undefined capacity => we don't bother
             int c = capacities[i][j];
             if (c == -1) continue;
-            //else if (c == -2) s.addUnit(Lit(i*n+j));
             //capacity of 0, we can't place any lightbulb around it
             else if (c == 0) {
                 for (int adj : adjacents) s.addUnit(~Lit(adj));
             }
-            //capacity of 1 : k! clauses
             else if (c == 1) {
                 handle_one_capacity(s, adjacents);
             }
