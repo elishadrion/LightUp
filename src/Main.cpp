@@ -96,25 +96,11 @@ void solve(int** capacities, int m, int n, bool find_all) {
  * @param n: width of each instance
  */
 
-void printlogical(int i, int j) {
-    std::cout << "(~" << i << "V" << "~" << j << ")" << std::endl;
-}
-
 void handle_free_case(Solver& s, int** capacities, int m, int n) {
     vec<Lit> lits;
     //For each case (thus literal/variable in the SAT), we find
     //the other cases which share the vertical and horizontal lines
     std::vector<int> horizontals = get_horizontal(capacities,m,n);
-
-    int p = 2;
-    for(int k = 0; k < horizontals.size(); k+=p) {
-      for(int i = 0; i < p; ++i) {
-        std::cout << horizontals[k+i] << " ";
-      }
-      std::cout << std::endl;
-    }
-    return;
-
     std::vector<int> verticals = get_vertical(capacities,m,n);
     for(int i = 0; i < horizontals.size(); i+=2) {
         s.addBinary(~Lit(horizontals[i]), ~Lit(horizontals[i]));
@@ -216,12 +202,12 @@ void handle_walls(Solver& s, int** capacities, int m, int n) {
  * @param n: width of each instance
  */
 std::vector<int> get_horizontal(int** capacities, int m, int n) {
-    pretty_print(capacities, m,n );
-    std::vector<int> horizontals, temp, combinations, input;
+    std::vector<int> horizontals, temp, input;
     //Iterate through all rows
     for(int i = 0; i < m; ++i) {
         int j = 0;
         while (j < n) {
+            //Wall case
             if (capacities[i][j] != -2) {
                 get_combinations(0, 2, input, horizontals, temp);
                 input.clear();
@@ -230,6 +216,7 @@ std::vector<int> get_horizontal(int** capacities, int m, int n) {
             }
             ++j;
         }
+        //To not forget to add
         get_combinations(0, 2, input, horizontals, temp);
         input.clear();
     }
@@ -243,19 +230,23 @@ std::vector<int> get_horizontal(int** capacities, int m, int n) {
  * @param n: width of each instance
  */
  std::vector<int> get_vertical(int** capacities, int m, int n) {
-     std::vector<int> verticals;
-     for (int j = 0; j < n; ++j) {
-       int i = -1;
-       while (i+1 < m-1) {
-         ++i;
-         //One of the pair is a wall, we pass
-         if (capacities[i][j] != -2 || capacities[i+1][j] != -2) {
-           continue;
+     std::vector<int> verticals, temp, input;
+     //Iterate throughout all the columns
+     for(int j = 0; j < n; ++j) {
+         int i = 0;
+         while (i < m) {
+             //Wall case
+             if (capacities[i][j] != -2) {
+                 get_combinations(0, 2, input, verticals, temp);
+                 input.clear();
+             } else {
+                 input.push_back(i*n+j);
+             }
+             ++i;
          }
-         //pushes a pair of cases to bundle with in a clause
-         verticals.push_back(i*n+j);
-         verticals.push_back((i+1)*n+j);
-       }
+         //To not forget to add
+         get_combinations(0, 2, input, verticals, temp);
+         input.clear();
      }
      return verticals;
  }
