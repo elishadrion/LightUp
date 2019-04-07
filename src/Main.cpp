@@ -15,6 +15,7 @@ void handle_walls(Solver& s, int** capacities, int m, int n);
  * Credit : https://stackoverflow.com/questions/12991758/creating-all-possible-k-combinations-of-n-items-in-c/28698654
  */
 void get_combinations(int offset, int k, std::vector<int>& vec,  std::vector<int>& combinations, std::vector<int>& temp) {
+    if (vec.empty() || vec.size() < k) return;
     if (k == 0) {
         combinations.insert(combinations.end(), temp.begin(), temp.end());
         return;
@@ -62,7 +63,27 @@ void solve(int** capacities, int m, int n, bool find_all) {
         }
     }
     handle_free_case(s, capacities, m, n);
-    handle_walls(s, capacities, m, n);
+    //handle_walls(s, capacities, m, n);
+
+
+    if (s.solve()) { // la formule est satisfaisable
+
+        std::cout << "La formule est satisfaisable avec la valuation o`u\n" ;
+
+        for (int i = 0 ; i < m*n ; i++) { // r´ecup´eration de la valuation
+          if (s.model[i] == l_True) {
+            std::cout << "la variable " << i << " est mise `a vraie\n";
+          }
+
+          else {
+            std::cout << "la variable " << i << " est mise `a faux\n";
+          }
+        }
+      }
+
+      else {
+        std::cout << "La formule n’est pas satisfaisable\n" ;
+      }
 
   // Fonction à compléter pour les questions 2 et 3 (et bonus 1)
 }
@@ -74,26 +95,34 @@ void solve(int** capacities, int m, int n, bool find_all) {
  * @param m: height of each instance
  * @param n: width of each instance
  */
+
+void printlogical(int i, int j) {
+    std::cout << "(~" << i << "V" << "~" << j << ")" << std::endl;
+}
+
 void handle_free_case(Solver& s, int** capacities, int m, int n) {
     vec<Lit> lits;
     //For each case (thus literal/variable in the SAT), we find
     //the other cases which share the vertical and horizontal lines
     std::vector<int> horizontals = get_horizontal(capacities,m,n);
+
+    int p = 2;
+    for(int k = 0; k < horizontals.size(); k+=p) {
+      for(int i = 0; i < p; ++i) {
+        std::cout << horizontals[k+i] << " ";
+      }
+      std::cout << std::endl;
+    }
+    return;
+
     std::vector<int> verticals = get_vertical(capacities,m,n);
     for(int i = 0; i < horizontals.size(); i+=2) {
-        lits.push(~Lit(horizontals[i]));
-        lits.push(~Lit(horizontals[i+1]));
-        s.addClause(lits);
-        lits.clear();
+        s.addBinary(~Lit(horizontals[i]), ~Lit(horizontals[i]));
     }
     for(int i = 0; i < verticals.size(); i+=2) {
-        lits.push(~Lit(verticals[i]));
-        lits.push(~Lit(verticals[i+1]));
-        s.addClause(lits);
-        lits.clear();
+        s.addBinary(~Lit(verticals[i]), ~Lit(verticals[i]));
     }
 }
-
 
 std::vector<int> get_adjacent_cases(int** capacities, int m, int n, int i, int j) {
     std::vector<int> adjacents;
@@ -105,11 +134,8 @@ std::vector<int> get_adjacent_cases(int** capacities, int m, int n, int i, int j
 }
 
 void handle_edge_case(Solver& s, std::vector<int>& adjacents) {
-    vec<Lit> lits;
     for (int adj : adjacents) {
-        lits.push(Lit(adj));
-        s.addClause(lits);
-        lits.clear();
+        s.addUnit(Lit(adj));
     }
 }
 
@@ -122,16 +148,13 @@ void handle_one_capacity(Solver& s, std::vector<int>& adjacents) {
     }
     std::vector<int> combinations;
     std::vector<int> temp;
+    //Get all the possible combinations of pairs of cases
     get_combinations(0, 2, adjacents, combinations, temp);
-    //for(int k = 0; k < combinations.size())
-    // for(int i = 0; i < adjacents.size(); ++i) {
-    //     for (int j = i+1; j < adjacents.size(); ++j) {
-    //         lits.push(~Lit(adjacents[i]));
-    //         lits.push(~Lit(adjacents[j]));
-    //         s.addClause(lits);
-    //         lits.clear();
-    //     }
-    // }
+    for(int k = 1; k < combinations.size(); ++k) {
+        s.addBinary(~Lit(combinations[k-1]), ~Lit(combinations[k]));
+    }
+    //Enforce placing a lightbulb on a case
+    // ????? ON NE DEVRAIT PAS FAIRE LA NEGATION DES AUTRES ENDROITS?
     for (int adj : adjacents) lits.push(Lit(adj));
     s.addClause(lits);
     lits.clear();
@@ -146,10 +169,7 @@ void handle_two_capacity(Solver& s, std::vector<int> adjacents) {
     }
     for(int i = 0; i < adjacents.size(); ++i) {
         for (int j = i+1; j < adjacents.size(); ++j) {
-            lits.push(~Lit(adjacents[i]));
-            lits.push(~Lit(adjacents[j]));
-            s.addClause(lits);
-            lits.clear();
+            s.addBinary(~Lit(adjacents[i]), ~Lit(adjacents[i]));
         }
     }
     for (int adj : adjacents) lits.push(Lit(adj));
@@ -196,19 +216,22 @@ void handle_walls(Solver& s, int** capacities, int m, int n) {
  * @param n: width of each instance
  */
 std::vector<int> get_horizontal(int** capacities, int m, int n) {
-    std::vector<int> horizontals;
+    pretty_print(capacities, m,n );
+    std::vector<int> horizontals, temp, combinations, input;
+    //Iterate through all rows
     for(int i = 0; i < m; ++i) {
-      int j = -1;
-      while(j+1 < n-1) {
-        ++j;
-        //One of the pair is a wall, we pass
-        if (capacities[i][j] != -2 || capacities[i][j+1] != -2) {
-          continue;
+        int j = 0;
+        while (j < n) {
+            if (capacities[i][j] != -2) {
+                get_combinations(0, 2, input, horizontals, temp);
+                input.clear();
+            } else {
+                input.push_back(i*n+j);
+            }
+            ++j;
         }
-        //pushes a pair of cases to bundle with in a clause
-        horizontals.push_back(i*n+j);
-        horizontals.push_back(i*n+j+1);
-      }
+        get_combinations(0, 2, input, horizontals, temp);
+        input.clear();
     }
     return horizontals;
  }
