@@ -118,6 +118,7 @@ void handle_all_lighted_up(Solver& s, int** capacities, int m, int n) {
         for(int j = 0; j < n; ++j) {
             //For every case, we get the entire cross
             //Starting with the entire row and then the entire column
+            if (capacities[i][j] != -2) continue;
             lits.push(Lit(i*n+j));
             int k = j+1;
             //From current position to rightmost of the row
