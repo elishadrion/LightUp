@@ -43,6 +43,29 @@ void pretty_print(int** matrix, int m, int n) {
   }
 }
 
+void print_result(vec<lbool>& model, int** matrix, int m, int n) {
+    //print the positions of the lightbulbs
+    for (int k = 0; k < m*n; ++k) {
+        if (model[k] == l_True) {
+            int i = k/m;
+            int j = k-(i*n);
+            std::cout << i << " " << j << std::endl;
+        }
+    }
+    //print the grid
+    for (int k = 0; k < m*n; ++k) {
+        int i = k/m;
+        int j = k-(i*n);
+        if (model[k] == l_True) {
+            std::cout << "X" << "\t";
+        } else {
+            if (matrix[i][j] == -2) std::cout << "-" << "\t";
+            else std::cout << matrix[i][j] << "\t";
+        }
+        if (j == n-1) std::cout << std::endl;
+    }
+}
+
 /**
  * Solves the given light-up instance.
  * @param capacities: instance capacities to solve, an `m` by `n` matrix.
@@ -52,34 +75,26 @@ void pretty_print(int** matrix, int m, int n) {
  */
 void solve(int** capacities, int m, int n, bool find_all) {
 
-    //Xij = -2 -> vide
-    //Xij = -1 -> mur capacité infinie
-    //Xij = 0..4 -> mur capacité
-    Solver s;
-    //Create a variable per case
-    for (int i = 0; i < m*n; ++i) s.newVar();
-    handle_no_sharing_cases(s, capacities, m, n);
-    handle_all_lighted_up(s, capacities, m, n);
-    handle_walls(s, capacities, m, n);
+    bool cont = true;
+    while (cont) {
+        Solver s;
+        for (int i = 0; i < m*n; ++i) s.newVar();
+        //Create a variable per case
+        handle_no_sharing_cases(s, capacities, m, n);
+        handle_all_lighted_up(s, capacities, m, n);
+        handle_walls(s, capacities, m, n);
 
 
-    if (s.solve()) { // la formule est satisfaisable
-
-        std::cout << "La formule est satisfaisable avec la valuation \n" ;
-        for (int i = 0 ; i < m*n ; i++) { // r´ecup´eration de la valuation
-          if (s.model[i] == l_True) {
-            std::cout << "la variable " << i << " est mise à vraie\n";
-          }
-          else {
-            std::cout << "la variable " << i << " est mise à faux\n";
-          }
+        if (s.solve()) { // la formule est satisfaisable
+            std::cout << "La formule est satisfaisable avec la valuation \n" ;
+            print_result(s.model, capacities, m, n);
         }
-      }
-
-      else {
-        std::cout << "La formule n’est pas satisfaisable\n" ;
-      }
-
+        else {
+            std::cout << "La formule n’est pas satisfaisable\n" ;
+            cont = false;
+        }
+        cont = cont && find_all;
+    }
   // Fonction à compléter pour les questions 2 et 3 (et bonus 1)
 }
 
@@ -102,13 +117,6 @@ void handle_no_sharing_cases(Solver& s, int** capacities, int m, int n) {
     for(int i = 0; i < verticals.size(); i+=2) {
         s.addBinary(~Lit(verticals[i]), ~Lit(verticals[i+1]));
     }
-}
-
-bool is_in_vec(std::vector<int>& vec, int check) {
-    for (int k : vec ) {
-        if (k == check) return true;
-    }
-    return false;
 }
 
 void handle_all_lighted_up(Solver& s, int** capacities, int m, int n) {
@@ -201,20 +209,41 @@ void handle_one_capacity(Solver& s, std::vector<int>& adjacents) {
  * @param adjacents : the cases adjacent to the wall
  */
 void handle_two_capacity(Solver& s, std::vector<int> adjacents) {
-    vec<Lit> lits;
+    std::vector<int> combinations, temp;
     //Edge case where only two cases are free
     if (adjacents.size() == 2) {
         handle_edge_case(s, adjacents);
         return;
     }
-    for(int i = 0; i < adjacents.size(); ++i) {
-        for (int j = i+1; j < adjacents.size(); ++j) {
-            s.addBinary(~Lit(adjacents[i]), ~Lit(adjacents[i]));
-        }
+    get_combinations(0, 3, adjacents, combinations, temp);
+    for (int k = 0; k < combinations.size(); k+=3) {
+        //Maximum 2 cases set
+        s.addTernary(~Lit(combinations[k]), ~Lit(combinations[k+1]), ~Lit(combinations[k+2]));
+        //Minimum 2 cases set
+        s.addTernary(Lit(combinations[k]), Lit(combinations[k+1]), Lit(combinations[k+2]));
     }
-    for (int adj : adjacents) lits.push(Lit(adj));
+}
+
+/**
+ * Handles the construction of clauses for a wall with a capacity of 3
+ * @param s: Solver
+ * @param adjacents : the cases adjacent to the wall
+ */
+void handle_three_capacity(Solver& s, std::vector<int> adjacents) {
+    std::vector<int> combinations, temp;
+    //Edge case where only two cases are free
+    if (adjacents.size() == 3) {
+        handle_edge_case(s, adjacents);
+        return;
+    }
+    get_combinations(0, 2, adjacents, combinations, temp);
+    //We add the clause for minimum 3 cases set
+    for (int k = 0; k < combinations.size(); k+=2)
+        s.addBinary(Lit(combinations[k]), Lit(combinations[k+1]));
+    //Clause for maximum 3 cases set
+    vec<Lit> lits;
+    for (int adj : adjacents) lits.push(~Lit(adj));
     s.addClause(lits);
-    lits.clear();
 }
 
 /**
@@ -235,11 +264,11 @@ void handle_walls(Solver& s, int** capacities, int m, int n) {
             else if (c == 0) {
                 for (int adj : adjacents) s.addUnit(~Lit(adj));
             }
-            else if (c == 1) {
-                handle_one_capacity(s, adjacents);
-            }
-            else if (c == 2) {
-                handle_two_capacity(s, adjacents);
+            else if (c == 1) handle_one_capacity(s, adjacents);
+            else if (c == 2) handle_two_capacity(s, adjacents);
+            else if (c == 3) handle_three_capacity(s, adjacents);
+            else if (c == 4) {
+                for (int adj : adjacents) s.addUnit(Lit(adj));
             }
         }
     }
