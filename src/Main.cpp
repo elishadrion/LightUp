@@ -71,15 +71,14 @@ void print_result(vec<lbool>& model, int** matrix, int m, int n) {
         }
         if (j == n-1) std::cout << std::endl;
     }
+    std::cout << std::endl;
 }
 
-std::vector<Lit> encode_solution(vec<lbool>& model, int m, int n) {
-    std::vector<Lit> solution;
+void encode_solution(Solver& s, int m, int n) {
     for (int i = 0; i < m*n; ++i) {
         //We forbid to set the i-th case to a lightbulb
-        if (model[i] == l_True) solution.push_back(~Lit(i));
+        if (s.model[i] == l_True) s.addUnit(~Lit(i));
     }
-    return solution;
 }
 
 /**
@@ -92,30 +91,21 @@ std::vector<Lit> encode_solution(vec<lbool>& model, int m, int n) {
 void solve(int** capacities, int m, int n, bool find_all) {
     //Vector to save the solutions of previous iterations
     //if we want to find them all
-    std::vector<std::vector<Lit>> previous_solutions;
+    Solver s;
+    for (int i = 0; i < m*n; ++i) s.newVar();
     bool cont = true;
     while (cont) {
-        Solver s;
-        for (int i = 0; i < m*n; ++i) s.newVar();
+        s.verbosity = 0;
         //Create a variable per case
         handle_no_sharing_cases(s, capacities, m, n);
         handle_all_lighted_up(s, capacities, m, n);
         handle_walls(s, capacities, m, n);
 
-        for (int k = 0; k < previous_solutions.size(); ++k) {
-            vec<Lit> sol;
-            for (Lit l : previous_solutions[k]) {
-                sol.push(l);}
-            s.addClause(sol);
-        }
-
-        if (s.solve()) { // la formule est satisfaisable
+        if (s.solve()) {
             print_result(s.model, capacities, m, n);
-            std::vector<Lit> prev = encode_solution(s.model, m, n);
-            previous_solutions.push_back(prev);
+            encode_solution(s, m, n);
         }
         else {
-            std::cout << "La formule n’est pas satisfaisable\n" ;
             cont = false;
         }
         cont = cont && find_all;
@@ -363,7 +353,13 @@ void handle_walls(Solver& s, int** capacities, int m, int n) {
  * @param n: width of each instance
  */
 void generate(int m, int n, int l) {
-  // Fonction à compléter pour la question bonus 2
+    int** capacities = new int*[m];
+    for (int i = 0; i < m; ++i) {
+      capacities[i] = new int[n];
+      for (int j = 0; j < n; ++j) {
+        capacities[i][j] = -2;
+      }
+    }
 }
 
 /**
