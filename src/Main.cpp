@@ -11,7 +11,7 @@ std::vector<int> get_vertical(int** capacities, int m, int n);
 void handle_no_sharing_cases(Solver& s, int** capacities, int m, int n);
 void handle_all_lighted_up(Solver& s, int** capacities, int m, int n);
 void handle_walls(Solver& s, int** capacities, int m, int n);
-
+int _solve(int** capacities, int m, int n, bool find_all, bool print, bool generation);
 /*
  * Credit : https://stackoverflow.com/questions/12991758/creating-all-possible-k-combinations-of-n-items-in-c/28698654
  */
@@ -74,6 +74,13 @@ void print_result(vec<lbool>& model, int** matrix, int m, int n) {
     std::cout << std::endl;
 }
 
+/**
+ * Encodes the solution as a clause in the solver
+ * Used when finding all the solutions
+ * @param s : the solver
+ * @param  m: matrix height
+ * @param  n: matrix width
+ */
 void encode_solution(Solver& s, int m, int n) {
     for (int i = 0; i < m*n; ++i) {
         //We forbid to set the i-th case to a lightbulb
@@ -88,12 +95,28 @@ void encode_solution(Solver& s, int m, int n) {
  * @param n: width of the instance
  * @param find_all: if true, find all valid solutions
  */
+
 void solve(int** capacities, int m, int n, bool find_all) {
+    int count = _solve(capacities, m, n, find_all, true, true);
+    if (count == 0) std::cout << "Le problème n'est pas satisfaisable.\n";
+}
+
+/**
+ * Solves the given light-up instance and returns the number of solutions
+ * @param capacities: instance capacities to solve, an `m` by `n` matrix.
+ * @param m: height of the instance
+ * @param n: width of the instance
+ * @param find_all: if true, find all valid solutions
+ * @param print: if true, prints the solutions found
+ * @param generation: if solve is to be used for generating grids
+ */
+int _solve(int** capacities, int m, int n, bool find_all, bool print, bool generation) {
     //Vector to save the solutions of previous iterations
     //if we want to find them all
     Solver s;
     for (int i = 0; i < m*n; ++i) s.newVar();
     bool cont = true;
+    int count  = 0;
     while (cont) {
         s.verbosity = 0;
         //Create a variable per case
@@ -102,14 +125,18 @@ void solve(int** capacities, int m, int n, bool find_all) {
         handle_walls(s, capacities, m, n);
 
         if (s.solve()) {
-            print_result(s.model, capacities, m, n);
+            //As soon as we find two solutions, we can stop for the generating problem
+            if (generation && count > 0) cont = false;
+            if (print) print_result(s.model, capacities, m, n);
             encode_solution(s, m, n);
+            ++count;
         }
         else {
             cont = false;
         }
         cont = cont && find_all;
     }
+    return count;
   // Fonction à compléter pour les questions 2 et 3 (et bonus 1)
 }
 
@@ -353,13 +380,6 @@ void handle_walls(Solver& s, int** capacities, int m, int n) {
  * @param n: width of each instance
  */
 void generate(int m, int n, int l) {
-    int** capacities = new int*[m];
-    for (int i = 0; i < m; ++i) {
-      capacities[i] = new int[n];
-      for (int j = 0; j < n; ++j) {
-        capacities[i][j] = -2;
-      }
-    }
 }
 
 /**
