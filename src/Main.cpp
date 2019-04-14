@@ -216,8 +216,22 @@ std::vector<int> get_adjacent_cases(int** capacities, int m, int n, int i, int j
  * @param s: Solver
  * @param adjacents : the cases adjacent to the wall
  */
-void handle_edge_case(Solver& s, std::vector<int>& adjacents) {
+void handle_just_enough_cases(Solver& s, std::vector<int>& adjacents) {
     for (int adj : adjacents) {
+        s.addUnit(Lit(adj));
+    }
+}
+
+/**
+ * Handles the construction of clauses for a wall with a
+ * number of free cases inferior to its capacity
+ * @param s: Solver
+ * @param adjacents : the cases adjacent to the wall
+ */
+void handle_not_enough_cases(Solver& s, std::vector<int>& adjacents) {
+    for (int adj : adjacents) {
+        //We create a contradiction to make the problem unsolvable
+        s.addUnit(~Lit(adj));
         s.addUnit(Lit(adj));
     }
 }
@@ -230,9 +244,13 @@ void handle_edge_case(Solver& s, std::vector<int>& adjacents) {
 void handle_one_capacity(Solver& s, std::vector<int>& adjacents) {
     vec<Lit> lits;
     std::vector<int> combinations, temp;
+    if (adjacents.size() < 1) {
+        handle_not_enough_cases(s, adjacents);
+        return;
+    }
     //Edge case where only one case is free
     if (adjacents.size() == 1) {
-        handle_edge_case(s, adjacents);
+        handle_just_enough_cases(s, adjacents);
         return;
     }
     //Get all the possible combinations of pairs of cases
@@ -252,9 +270,13 @@ void handle_one_capacity(Solver& s, std::vector<int>& adjacents) {
  */
 void handle_two_capacity(Solver& s, std::vector<int> adjacents) {
     std::vector<int> combinations, temp;
+    if (adjacents.size() < 2) {
+        handle_not_enough_cases(s, adjacents);
+        return;
+    }
     //Edge case where only two cases are free
     if (adjacents.size() == 2) {
-        handle_edge_case(s, adjacents);
+        handle_just_enough_cases(s, adjacents);
         return;
     }
     get_combinations(0, 3, adjacents, combinations, temp);
@@ -273,9 +295,13 @@ void handle_two_capacity(Solver& s, std::vector<int> adjacents) {
  */
 void handle_three_capacity(Solver& s, std::vector<int> adjacents) {
     std::vector<int> combinations, temp;
+    if (adjacents.size() < 3) {
+        handle_not_enough_cases(s, adjacents);
+        return;
+    }
     //Edge case where only two cases are free
     if (adjacents.size() == 3) {
-        handle_edge_case(s, adjacents);
+        handle_just_enough_cases(s, adjacents);
         return;
     }
     get_combinations(0, 2, adjacents, combinations, temp);
@@ -288,6 +314,15 @@ void handle_three_capacity(Solver& s, std::vector<int> adjacents) {
     s.addClause(lits);
 }
 
+/**
+ * Handles the construction of clauses for a wall with a capacity of 4
+ * @param s: Solver
+ * @param adjacents : the cases adjacent to the wall
+ */
+void handle_four_capacity(Solver& s, std::vector<int> adjacents) {
+    if (adjacents.size() < 4) handle_not_enough_cases(s, adjacents);
+    for (int adj : adjacents) s.addUnit(Lit(adj));
+}
 /**
  * Handles the construction of clauses for all the walls (0 to 4 lightbulbs)
  * @param s: Solver
@@ -309,9 +344,7 @@ void handle_walls(Solver& s, int** capacities, int m, int n) {
             else if (c == 1) handle_one_capacity(s, adjacents);
             else if (c == 2) handle_two_capacity(s, adjacents);
             else if (c == 3) handle_three_capacity(s, adjacents);
-            else if (c == 4) {
-                for (int adj : adjacents) s.addUnit(Lit(adj));
-            }
+            else if (c == 4) handle_four_capacity(s, adjacents);
         }
     }
 }
