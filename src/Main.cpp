@@ -1,6 +1,3 @@
-/* 426215 - Drion Elisha
- *
- */
 #include <iostream>
 #include <vector>
 #include <string>
@@ -56,7 +53,7 @@ void print_result(vec<lbool>& model, int** matrix, int m, int n) {
         if (model[k] == l_True) {
             int i = k/m;
             int j = k-(i*n);
-            std::cout << i+1 << " " << j+1 << std::endl;
+            std::cout << i << " " << j << std::endl;
         }
     }
     //print the grid
@@ -95,10 +92,8 @@ void encode_solution(Solver& s, int m, int n) {
  * @param n: width of the instance
  * @param find_all: if true, find all valid solutions
  */
-
 void solve(int** capacities, int m, int n, bool find_all) {
     int count = _solve(capacities, m, n, find_all, true, true);
-    if (count == 0) std::cout << "Le problème n'est pas satisfaisable.\n";
 }
 
 /**
@@ -147,6 +142,7 @@ int _solve(int** capacities, int m, int n, bool find_all, bool print, bool gener
  * @param capacities : the matrix representing the problem
  * @param m: height of each instance
  * @param n: width of each instance
+ * Clause 2.1 du rapport
  */
 void handle_no_sharing_cases(Solver& s, int** capacities, int m, int n) {
     //For each case (thus literal/variable in the SAT), we find
@@ -161,6 +157,15 @@ void handle_no_sharing_cases(Solver& s, int** capacities, int m, int n) {
     }
 }
 
+/**
+ * Handles the construction of clauses ensuring all free
+ * cases are lit
+ * @param s: Solver
+ * @param capacities : the matrix representing the problem
+ * @param m: height of each instance
+ * @param n: width of each instance
+ * Clause 2.2 du rapport
+ */
 void handle_all_lighted_up(Solver& s, int** capacities, int m, int n) {
     //"Cross" formed by the row and the column we want lighted up
     vec<Lit> lits;
@@ -203,10 +208,10 @@ void handle_all_lighted_up(Solver& s, int** capacities, int m, int n) {
 
 std::vector<int> get_adjacent_cases(int** capacities, int m, int n, int i, int j) {
     std::vector<int> adjacents;
-    if (i-1 >= 0 && capacities[i-1][j] == -2) adjacents.push_back((i-1)*n+j);
-    if (i+1 < m && capacities[i+1][j] == -2) adjacents.push_back((i+1)*n+j);
-    if (j-1 >= 0 && capacities[i][j-1] == -2) adjacents.push_back(i*n+j-1);
-    if (j+1 < n && capacities[i][j+1] == -2) adjacents.push_back(i*n+j+1);
+    if (i-1 >= 0) adjacents.push_back((i-1)*n+j);
+    if (i+1 < m) adjacents.push_back((i+1)*n+j);
+    if (j-1 >= 0) adjacents.push_back(i*n+j-1);
+    if (j+1 < n) adjacents.push_back(i*n+j+1);
     return adjacents;
 }
 
@@ -215,6 +220,7 @@ std::vector<int> get_adjacent_cases(int** capacities, int m, int n, int i, int j
  * c (its capacity) free cases around it
  * @param s: Solver
  * @param adjacents : the cases adjacent to the wall
+ * Clause 2.3.1 du rapport
  */
 void handle_just_enough_cases(Solver& s, std::vector<int>& adjacents) {
     for (int adj : adjacents) {
@@ -227,6 +233,7 @@ void handle_just_enough_cases(Solver& s, std::vector<int>& adjacents) {
  * number of free cases inferior to its capacity
  * @param s: Solver
  * @param adjacents : the cases adjacent to the wall
+ * Clause 2.3.2 du rapport
  */
 void handle_not_enough_cases(Solver& s, std::vector<int>& adjacents) {
     for (int adj : adjacents) {
@@ -237,22 +244,34 @@ void handle_not_enough_cases(Solver& s, std::vector<int>& adjacents) {
 }
 
 /**
+ * Preprocesses the handling of clauses for a wall
+ * @param s: Solver
+ * @param adjacents : the cases adjacent to the wall
+ * @param capacity : the capacity of the wall
+ * Clause 2.3.2 du rapport
+ */
+void preprocess_walls(Solver& s, std::vector<int>& adjacents, int capacity) {
+    if (adjacents.size() < capacity) {
+        handle_not_enough_cases(s, adjacents);
+        return;
+    }
+    //Edge case where only c cases are free
+    if (adjacents.size() == capacity) {
+        handle_just_enough_cases(s, adjacents);
+        return;
+    }
+}
+
+/**
  * Handles the construction of clauses for a wall with a capacity of 1
  * @param s: Solver
  * @param adjacents : the cases adjacent to the wall
+ * Clause 2.3.4 du rapport
  */
 void handle_one_capacity(Solver& s, std::vector<int>& adjacents) {
     vec<Lit> lits;
     std::vector<int> combinations, temp;
-    if (adjacents.size() < 1) {
-        handle_not_enough_cases(s, adjacents);
-        return;
-    }
-    //Edge case where only one case is free
-    if (adjacents.size() == 1) {
-        handle_just_enough_cases(s, adjacents);
-        return;
-    }
+    preprocess_walls(s, adjacents, 1);
     //Get all the possible combinations of pairs of cases
     get_combinations(0, 2, adjacents, combinations, temp);
     for(int k = 1; k < combinations.size(); ++k) {
@@ -267,18 +286,11 @@ void handle_one_capacity(Solver& s, std::vector<int>& adjacents) {
  * Handles the construction of clauses for a wall with a capacity of 2
  * @param s: Solver
  * @param adjacents : the cases adjacent to the wall
+ * Clause 2.3.5 du rapport
  */
 void handle_two_capacity(Solver& s, std::vector<int> adjacents) {
     std::vector<int> combinations, temp;
-    if (adjacents.size() < 2) {
-        handle_not_enough_cases(s, adjacents);
-        return;
-    }
-    //Edge case where only two cases are free
-    if (adjacents.size() == 2) {
-        handle_just_enough_cases(s, adjacents);
-        return;
-    }
+    preprocess_walls(s, adjacents, 2);
     get_combinations(0, 3, adjacents, combinations, temp);
     for (int k = 0; k < combinations.size(); k+=3) {
         //Maximum 2 cases set
@@ -292,18 +304,11 @@ void handle_two_capacity(Solver& s, std::vector<int> adjacents) {
  * Handles the construction of clauses for a wall with a capacity of 3
  * @param s: Solver
  * @param adjacents : the cases adjacent to the wall
+ * Clause 2.3.6 du rapport
  */
 void handle_three_capacity(Solver& s, std::vector<int> adjacents) {
     std::vector<int> combinations, temp;
-    if (adjacents.size() < 3) {
-        handle_not_enough_cases(s, adjacents);
-        return;
-    }
-    //Edge case where only two cases are free
-    if (adjacents.size() == 3) {
-        handle_just_enough_cases(s, adjacents);
-        return;
-    }
+    preprocess_walls(s, adjacents, 3);
     get_combinations(0, 2, adjacents, combinations, temp);
     //We add the clause for minimum 3 cases set
     for (int k = 0; k < combinations.size(); k+=2)
@@ -318,9 +323,10 @@ void handle_three_capacity(Solver& s, std::vector<int> adjacents) {
  * Handles the construction of clauses for a wall with a capacity of 4
  * @param s: Solver
  * @param adjacents : the cases adjacent to the wall
+ * Clause 2.3.7 du rapport
  */
 void handle_four_capacity(Solver& s, std::vector<int> adjacents) {
-    if (adjacents.size() < 4) handle_not_enough_cases(s, adjacents);
+    preprocess_walls(s, adjacents, 4);
     for (int adj : adjacents) s.addUnit(Lit(adj));
 }
 /**
@@ -336,6 +342,7 @@ void handle_walls(Solver& s, int** capacities, int m, int n) {
             std::vector<int> adjacents = get_adjacent_cases(capacities, m, n, i, j);
             //undefined capacity => we don't bother
             int c = capacities[i][j];
+            if (c > -2) s.addUnit(~Lit(n*i+j));
             if (c == -1) continue;
             //capacity of 0, we can't place any lightbulb around it
             else if (c == 0) {
@@ -404,16 +411,6 @@ void handle_walls(Solver& s, int** capacities, int m, int n) {
      }
      return verticals;
  }
-
-/**
- * Generates `l` instances of the light-up problem, each with a unique solution,
- * and prints them on the standard output.
- * @param instance: instance to solve, an `m` by `n` matrix.
- * @param m: height of each instance
- * @param n: width of each instance
- */
-void generate(int m, int n, int l) {
-}
 
 /**
  * Prints program help message
